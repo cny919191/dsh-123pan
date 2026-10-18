@@ -62,10 +62,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/USER/dsh-123pan.git"
+    "url": "git+https://github.com/cny919191/dsh-123pan.git"
   },
-  "homepage": "https://github.com/USER/dsh-123pan#readme",
+  "homepage": "https://github.com/cny919191/dsh-123pan#readme",
   "bugs": {
-    "url": "https://github.com/USER/dsh-123pan/issues"
-  }
+    "url": "https://github.com/cny919191/dsh-123pan/issues"
+  },
+  "author": "cny919191"
 }
