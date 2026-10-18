@@ -137,7 +137,27 @@ curl -X POST http://127.0.0.1:<port>/api/dsh-123pan/loginToken \
 
 同名文件不会覆盖，会自动加 ` (1)`、` (2)`。
 
-### 4.3 其他操作
+### 4.3 在线预览
+
+**点文件名就能看**，不用先下载：
+
+| 类型 | 支持格式 | 说明 |
+|---|---|---|
+| 文本 | `.txt .md .json .log .yml .ini .csv .py .js .ts .c .cpp .go .rs .sql .lrc ...` | 宿主拉取后解码，UTF-8 → GBK → latin1 逐级回退；2MB 上限 |
+| 图片 | `.jpg .jpeg .png .gif .webp .bmp .avif` | 弹层内等比缩放 |
+| 视频 | `.mp4 .webm .mkv .mov .avi` | 带播放条，**支持拖进度**（服务端转发 Range） |
+| 音频 | `.mp3 .flac .wav .ogg .m4a .aac` | 带播放条 |
+| PDF | `.pdf` | 用浏览器内置阅读器 |
+
+其他类型（压缩包、Office 文档等）会提示「不支持在线预览，请下载后查看」。
+按 `Esc` 或点背景关闭，点右上「关闭」也可以。
+
+> 为什么需要代理：123 云盘直链的 `Content-Type` 一律是 `application/octet-stream`。
+> `<img>` 会嗅探所以直链也能显示，但 `<video>` 依赖正确的 MIME 才能播，而且拖进度要能
+> `Range`。插件因此提供同源代理 `/api/dsh-123pan/media?id=<fileId>&name=<文件名>`，
+> 按扩展名补 MIME 并转发 Range（只接受 `GET/HEAD`、仅本机回环、响应带 `nosniff`）。
+
+### 4.4 其他操作
 
 - **新建目录**：工具栏「新建目录」
 - **搜索**：输入框回车
@@ -227,7 +247,7 @@ curl -X POST http://127.0.0.1:<port>/api/dsh-123pan/diag
 ```
 
 完整路由：
-`status · login · loginToken · logout · list · mkdir · upload · uploadBytes · uploadBatch · download · url · rename · move · trash · purge · version · diag · scan · backup · backups · forget`
+`status · login · loginToken · logout · list · mkdir · upload · uploadBytes · uploadBatch · download · preview · media(GET) · url · rename · move · trash · purge · version · diag · scan · backup · backups · forget`
 
 端口就是 DSH Web GUI 的端口（运行时上下文里的那个）。
 

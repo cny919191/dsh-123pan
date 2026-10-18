@@ -30,6 +30,7 @@ dsh 插件 ──工具/设置页──▶ 123pan-core.exe（C++ 静态链接）
 | 侧边栏面板 | 左侧栏「123 云盘」图标，点开就是网盘文件浏览 |
 | 拖拽上传 | 把文件拖进侧栏面板（或点「选择文件」）直接上传到当前目录 |
 | 拖拽下载 | 点文件行的「下载」，默认存到工作区根目录，可在面板底部改 |
+| 在线预览 | 点文件名直接看文本 / 图片 / 视频 / 音频 / PDF，不用先下载 |
 | 主题跟随 | 设置页与侧栏面板只用宿主主题 token，亮/暗色自动跟随 |
 
 ## 安装
@@ -146,7 +147,7 @@ curl -X POST http://127.0.0.1:<port>/api/dsh-123pan/uploadBatch   -H 'content-ty
 curl -X POST http://127.0.0.1:<port>/api/dsh-123pan/download   -H 'content-type: application/json'   -d '{"fileId":123,"name":"a.zip","dir":"D:\work"}'
 ```
 
-完整路由：`status · login · loginToken · logout · list · mkdir · upload · uploadBytes · uploadBatch · download · url · rename · move · trash · purge · version · scan · backup · backups · forget`
+完整路由：`status · login · loginToken · logout · list · mkdir · upload · uploadBytes · uploadBatch · download · preview · media(GET) · url · rename · move · trash · purge · version · diag · scan · backup · backups · forget`
 
 状态查询：`GET`/`POST http://127.0.0.1:<port>/api/dsh-123pan/status`（只接受 POST + 本机回环）。
 

@@ -1,5 +1,22 @@
 # 更新记录
 
+## 1.3.0
+
+**新增：在线预览（文本 / 图片 / 视频 / 音频 / PDF）**
+
+- 侧栏面板与设置页的文件名现在可点击，弹层直接看内容，不用先下载
+- 文本由宿主拉取并解码（UTF-8 → GBK → latin1 逐级回退），2MB 上限
+- 图片/视频/音频/PDF 走**同源媒体代理** `/api/dsh-123pan/media`
+  - 123 的直链 `Content-Type` 是 `application/octet-stream`，`<video>` 认不了，
+    代理按扩展名补正确 MIME
+  - 转发 `Range`，支持视频拖进度（实测 206 + `content-range`）
+  - 直链缓存 15 分钟，避免拖动时反复换签名 URL
+- 只接受 `GET/HEAD`，仅本机回环；响应带 `nosniff`，不执行远端内容
+
+**测试**
+- `test/preview.mjs`：UTF-8/GBK 文本解码、图片 MIME、Range 206、PDF
+- `test/preview_ui.mjs`：点击触发请求、7 种预览状态渲染
+
 ## 1.2.0
 
 **新增：三种「直接给 API Key」的用法，都不需要账号密码**

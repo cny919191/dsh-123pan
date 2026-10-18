@@ -83,6 +83,17 @@ window.__ModuleLoader__.load({
 .dsp123-noteWarn{background:var(--dsw-alias-state-warn-tertiary);color:var(--dsw-alias-label-primary);border-left:3px solid var(--dsw-alias-state-warn-primary);}
 .dsp123-progress{height:6px;border-radius:999px;background:var(--dsw-alias-bg-skeleton);overflow:hidden;}
 .dsp123-progress > i{display:block;height:100%;border-radius:999px;background:var(--dsw-alias-brand-primary);transition:width 160ms ease;}
+.dsp123-pv{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;padding:28px;background:rgba(0,0,0,.62);}
+.dsp123-pvBox{display:flex;flex-direction:column;max-width:min(1100px,94vw);max-height:90vh;border-radius:12px;overflow:hidden;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);box-shadow:0 16px 48px rgba(0,0,0,.45);}
+.dsp123-pvHead{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--dsw-alias-border-l1);}
+.dsp123-pvBody{padding:12px;overflow:auto;display:flex;align-items:center;justify-content:center;min-width:300px;min-height:140px;}
+.dsp123-pvImg{max-width:100%;max-height:76vh;object-fit:contain;display:block;}
+.dsp123-pvMedia{max-width:100%;max-height:76vh;background:#000;display:block;border-radius:6px;}
+.dsp123-pvAudio{width:min(520px,80vw);}
+.dsp123-pvFrame{width:min(900px,88vw);height:76vh;border:0;background:#fff;border-radius:6px;}
+.dsp123-pvText{margin:0;max-height:76vh;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;font-family:ui-monospace,Consolas,'Courier New',monospace;font-size:12px;line-height:1.65;color:var(--dsw-alias-label-primary);}
+.dsp123-nameBtn{padding:0;border:0;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.dsp123-nameBtn:hover{color:var(--dsw-alias-brand-primary);text-decoration:underline;}
 .dsp123-table{width:100%;border-collapse:collapse;font-size:12px;}
 .dsp123-table th{text-align:left;font-weight:500;color:var(--dsw-alias-label-tertiary);padding:6px 8px;border-bottom:1px solid var(--dsw-alias-border-l1);white-space:nowrap;}
 .dsp123-table td{padding:6px 8px;border-bottom:1px solid var(--dsw-alias-border-l1);color:var(--dsw-alias-label-primary);vertical-align:middle;}
@@ -96,6 +107,62 @@ window.__ModuleLoader__.load({
 `;
 
     // ---------------- 主面板 ----------------
+    /**
+     * 在线预览浮层（两个面板共用）。返回元素树；无预览内容时返回 null。
+     * pv.kind: text / image / video / audio / pdf / other
+     */
+    function previewTree(pv, onClose) {
+      if (!pv) return null;
+      let body = null;
+      if (pv.loading) {
+        body = h('div', { className: 'dsp123-sub' }, '加载中…');
+      } else if (pv.error) {
+        body = h('div', { className: 'dsp123-note dsp123-noteErr' }, pv.error);
+      } else if (pv.kind === 'text') {
+        body = h('pre', { className: 'dsp123-pvText' }, pv.text);
+      } else if (pv.kind === 'image') {
+        body = h('img', { className: 'dsp123-pvImg', src: pv.mediaUrl, alt: pv.name });
+      } else if (pv.kind === 'video') {
+        body = h('video', { className: 'dsp123-pvMedia', src: pv.mediaUrl, controls: true, autoPlay: true });
+      } else if (pv.kind === 'audio') {
+        body = h('audio', { className: 'dsp123-pvAudio', src: pv.mediaUrl, controls: true, autoPlay: true });
+      } else if (pv.kind === 'pdf') {
+        body = h('iframe', { className: 'dsp123-pvFrame', src: pv.mediaUrl, title: pv.name });
+      } else {
+        body = h('div', { className: 'dsp123-sub' }, '这种格式不支持在线预览，请用「下载」保存后查看。');
+      }
+      const meta = pv.kind === 'text' && pv.lines ? `${pv.lines} 行` : pv.size ? formatBytes(pv.size) : '';
+      return h(
+        'div',
+        {
+          className: 'dsp123-pv',
+          onClick: (e) => {
+            if (e.target === e.currentTarget) onClose();
+          },
+        },
+        h(
+          'div',
+          { className: 'dsp123-pvBox' },
+          h(
+            'div',
+            { className: 'dsp123-pvHead' },
+            h(
+              'strong',
+              { style: { fontSize: 13, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } },
+              pv.name || '预览'
+            ),
+            meta && h('span', { className: 'dsp123-sub', style: { fontSize: 11, flex: 'none' } }, meta),
+            h(
+              'button',
+              { className: 'dsp123-btn', style: { height: 24, padding: '0 8px', fontSize: 12, flex: 'none' }, onClick: onClose, title: '关闭（Esc）' },
+              '关闭'
+            )
+          ),
+          h('div', { className: 'dsp123-pvBody' }, body)
+        )
+      );
+    }
+
     function Pan123Panel() {
       const [tab, setTab] = useState('account');
       const [status, setStatus] = useState({ loading: true, value: null, error: null });
@@ -405,6 +472,7 @@ window.__ModuleLoader__.load({
       const [confirmState, setConfirmState] = useState(null);
       const [notice, setNotice] = useState(null);
       const [progress, setProgress] = useState(null);
+      const [previewState, setPreviewState] = useState(null);
 
       const load = useCallback(
         async (pid, opts = {}) => {
@@ -538,6 +606,28 @@ window.__ModuleLoader__.load({
         });
       };
 
+      const openPreview = useCallback(async (item) => {
+        if (!item || item.type === 1) return;
+        setPreviewState({ loading: true, name: item.name, error: null });
+        try {
+          const value = await call('preview', { fileId: item.fileId, name: item.name, size: item.size });
+          setPreviewState({ loading: false, error: null, ...value });
+        } catch (error) {
+          setPreviewState({ loading: false, name: item.name, error: error.message || '预览失败' });
+        }
+      }, []);
+
+      const closePreview = useCallback(() => setPreviewState(null), []);
+
+      useEffect(() => {
+        if (!previewState) return undefined;
+        const onKey = (e) => {
+          if (e.key === 'Escape') closePreview();
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+      }, [previewState, closePreview]);
+
       if (!loggedIn) {
         return h('div', { className: 'dsp123-card' }, h('p', null, '请先在「账号」页登录 123 云盘。'));
       }
@@ -654,7 +744,11 @@ window.__ModuleLoader__.load({
                       null,
                       item.type === 1
                         ? h('button', { className: 'dsp123-btn', style: { height: 24, padding: '0 8px', fontSize: 12 }, onClick: () => enter(item) }, `📁 ${item.name}`)
-                        : `📄 ${item.name}`
+                        : h(
+                            'button',
+                            { className: 'dsp123-nameBtn', title: '点击在线预览', onClick: () => openPreview(item) },
+                            `📄 ${item.name}`
+                          )
                     ),
                     h('td', null, item.type === 1 ? '—' : formatBytes(item.size)),
                     h('td', { className: 'dsp123-sub' }, String(item.updateAt || '').slice(0, 19).replace('T', ' ')),
@@ -733,7 +827,8 @@ window.__ModuleLoader__.load({
               value: downloadPath,
               onChange: (e) => setDownloadPath(e.target.value),
             })
-          )
+          ),
+          previewTree(previewState, closePreview)
         )
       );
     }
@@ -1044,6 +1139,7 @@ window.__ModuleLoader__.load({
       // 自定义下载目录：空字符串表示「跟随工作区」。
       // 用户一旦手动填了值，就固定用那个目录，直到点「跟随工作区」恢复。
       const [customDir, setCustomDir] = useState('');
+      const [previewState, setPreviewState] = useState(null);
       const [confirmState, setConfirmState] = useState(null);
       const [mkdirOpen, setMkdirOpen] = useState(false);
       const [mkdirName, setMkdirName] = useState('');
@@ -1255,6 +1351,36 @@ window.__ModuleLoader__.load({
         );
       }
 
+      /** 打开在线预览：文本由宿主解码，图片/视频/PDF 走同源媒体代理。 */
+      const openPreview = useCallback(async (item) => {
+        if (!item || item.type === 1) return;
+        setPreviewState({ loading: true, name: item.name, error: null });
+        try {
+          const value = await call('preview', {
+            fileId: item.fileId,
+            name: item.name,
+            size: item.size,
+          });
+          setPreviewState({ loading: false, error: null, ...value });
+        } catch (error) {
+          setPreviewState({ loading: false, name: item.name, error: error.message || '预览失败' });
+        }
+      }, []);
+
+      const closePreview = useCallback(() => setPreviewState(null), []);
+
+      useEffect(() => {
+        if (!previewState) return undefined;
+        const onKey = (e) => {
+          if (e.key === 'Escape') closePreview();
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+      }, [previewState, closePreview]);
+
+      const renderPreview = () => previewTree(previewState, closePreview);
+
+
       return h(
         'div',
         {
@@ -1449,16 +1575,11 @@ window.__ModuleLoader__.load({
                     `📁 ${item.name}`
                   )
                 : h(
-                    'span',
+                    'button',
                     {
-                      style: {
-                        flex: 1,
-                        minWidth: 0,
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                      },
-                      title: item.name,
+                      className: 'dsp123-nameBtn',
+                      title: '点击在线预览',
+                      onClick: () => openPreview(item),
                     },
                     `📄 ${item.name}`
                   ),
@@ -1517,7 +1638,8 @@ window.__ModuleLoader__.load({
             onChange: (e) => setCustomDir(e.target.value),
             title: '下载的文件会保存到这个目录；清空或点「跟随工作区」恢复自动跟随',
           })
-        )
+        ),
+        renderPreview()
       );
     }
 
