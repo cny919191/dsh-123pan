@@ -107,6 +107,12 @@ for (const [label, state, pred] of cases) {
   check(`${label}预览渲染`, pred(render(state)));
 }
 
+// 4) 大文件：按路径上传入口必须存在
+const pathInput = find(render(null), (n) => n.type === 'input' && String(n.props?.placeholder || '').includes('路径上传'));
+check('按路径上传输入框', pathInput.length === 1);
+const pathBtn = find(render(null), (n) => n.type === 'button' && String(JSON.stringify(n.children || '')).includes('按路径上传'));
+check('按路径上传按钮', pathBtn.length === 1);
+
 // 4) 媒体地址是相对同源路径
 check(
   'mediaUrl 同源',

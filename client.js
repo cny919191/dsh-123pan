@@ -111,6 +111,9 @@ window.__ModuleLoader__.load({
      * 在线预览浮层（两个面板共用）。返回元素树；无预览内容时返回 null。
      * pv.kind: text / image / video / audio / pdf / other
      */
+    /** 拖拽上传走 base64，超过这个体积就引导改用「按路径上传」。 */
+    const DRAG_UPLOAD_LIMIT = 64 * 1024 * 1024;
+
     function previewTree(pv, onClose) {
       if (!pv) return null;
       let body = null;
@@ -1140,6 +1143,7 @@ window.__ModuleLoader__.load({
       // 用户一旦手动填了值，就固定用那个目录，直到点「跟随工作区」恢复。
       const [customDir, setCustomDir] = useState('');
       const [previewState, setPreviewState] = useState(null);
+      const [uploadPath, setUploadPath] = useState('');
       const [confirmState, setConfirmState] = useState(null);
       const [mkdirOpen, setMkdirOpen] = useState(false);
       const [mkdirName, setMkdirName] = useState('');
@@ -1244,7 +1248,15 @@ window.__ModuleLoader__.load({
           setBusy('upload');
           setProgress({ name: file.name, index: done + 1, total: list.length });
           try {
+            // 拖拽走 base64：浏览器要把整个文件读进内存再转码，
+            // 大文件既慢又容易读空，所以超过 64MB 直接引导用「按路径上传」。
+            if (file.size > DRAG_UPLOAD_LIMIT) {
+              throw new Error(
+                `文件 ${formatBytes(file.size)} 超过拖拽上限 ${formatBytes(DRAG_UPLOAD_LIMIT)}，请用下面的「按路径上传」填写本机完整路径`
+              );
+            }
             const b64 = await readFileAsBase64(file);
+            if (!b64) throw new Error('浏览器没能读出文件内容，请改用「按路径上传」');
             await call('uploadBytes', { name: file.name, data: b64, parentId });
             done++;
           } catch (error) {
@@ -1266,6 +1278,32 @@ window.__ModuleLoader__.load({
         event.stopPropagation();
         setDragOver(false);
         uploadFiles(event.dataTransfer?.files);
+      };
+
+      /** 按本机路径上传：大文件走这条，不经过浏览器内存。 */
+      const uploadByPath = async () => {
+        const file = uploadPath.trim();
+        if (!file) {
+          setNotice({ kind: 'err', text: '请填写本机文件路径，例如 D:\\video\\a.mp4' });
+          return;
+        }
+        setBusy('upload');
+        setNotice(null);
+        setProgress({ name: file, index: 1, total: 1 });
+        try {
+          const value = await call('upload', { file, parentId });
+          setNotice({
+            kind: 'ok',
+            text: `${value.reused ? '秒传' : '上传'}完成：${value.name}（${formatBytes(value.size)}）`,
+          });
+          setUploadPath('');
+          await load(parentId);
+        } catch (error) {
+          setNotice({ kind: 'err', text: error.message });
+        } finally {
+          setBusy('');
+          setProgress(null);
+        }
       };
 
       // ---- 下载到工作区 ----
@@ -1448,6 +1486,32 @@ window.__ModuleLoader__.load({
             onClick: () => fileInputRef.current?.click(),
           },
           dragOver ? '松手即可上传到当前目录' : '把文件拖到这里上传，或点击选择'
+        ),
+
+        h(
+          'div',
+          { style: { display: 'flex', gap: 6, alignItems: 'center' } },
+          h('input', {
+            className: 'dsp123-input',
+            style: { flex: 1, minWidth: 0 },
+            placeholder: '大文件用路径上传，如 G:\\93阅兵.mp4',
+            value: uploadPath,
+            onChange: (e) => setUploadPath(e.target.value),
+            onKeyDown: (e) => {
+              if (e.key === 'Enter') uploadByPath();
+            },
+            title: '直接读本机文件上传，不经过浏览器内存，适合几百 MB 的大文件',
+          }),
+          h(
+            'button',
+            {
+              className: 'dsp123-btn',
+              style: { flex: 'none' },
+              onClick: uploadByPath,
+              disabled: busy === 'upload',
+            },
+            busy === 'upload' ? '…' : '按路径上传'
+          )
         ),
 
         progress &&
