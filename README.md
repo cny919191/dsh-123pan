@@ -34,6 +34,32 @@ dsh 插件 ──工具/设置页──▶ 123pan-core.exe（C++ 静态链接）
 
 ## 安装
 
+### 方式一：下载 Release（推荐）
+
+[**Releases → 下载 `dsh-123pan-vX.Y.Z.zip`**](https://github.com/cny919191/dsh-123pan/releases/latest)，解压到固定目录（例如 `D:\plugins\dsh-123pan`）。
+
+> 这个 zip 是**插件目录**，不是安装程序，不需要运行任何 exe。
+
+然后把它接线进 profile：
+
+```powershell
+# 1) 目录联接（不需要管理员权限）
+cmd /c mklink /J "%USERPROFILE%\.dsh\profiles\<profile>\node_modules\dsh-123pan" "D:\plugins\dsh-123pan"
+```
+
+2) 编辑 `%USERPROFILE%\.dsh\profiles\<profile>\package.json`，**两处都要加**：
+
+```json
+{
+  "dependencies": { "dsh-123pan": "file:D:/plugins/dsh-123pan" },
+  "dsh": { "profile": { "bundles": ["...", "dsh-123pan"] } }
+}
+```
+
+3) **完全退出** DSH（任务管理器确认 `DeepSeek Harness.exe` 全部消失）再打开。
+
+### 方式二：从源码
+
 ```bash
 # 1) 在插件目录构建核心（需要 MSYS2 ucrt64 的 g++）
 cd native/core
@@ -44,6 +70,8 @@ dsh plugin --profile <profile> add /absolute/path/to/dsh-123pan
 ```
 
 在 DSH 的「设置 → 插件」里确认 `dsh-123pan` 已启用，然后打开「设置 → 123 云盘」登录。
+
+> 详细步骤（含「装了没反应」的排查）见 [docs/USAGE.md](docs/USAGE.md) §2。
 
 ### 关于核心可执行文件
 
