@@ -1,0 +1,82 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Package tracked files
+        run: |
+          set -euo pipefail
+          NAME="dsh-123pan-${GITHUB_REF_NAME}.zip"
+          # git archive 只打包被跟踪的文件（自动排除 .git 与 .gitignore 里的内容）
+          git archive --format=zip --prefix=dsh-123pan/ -o "$NAME" HEAD
+          ls -lh "$NAME"
+          echo "ASSET=$NAME" >> "$GITHUB_ENV"
+
+      - name: Write release notes
+        run: |
+          cat > NOTES.md <<'NOTES'
+          123 云盘插件（DeepSeek Harness）
+
+          下载 `dsh-123pan-VERSION.zip` 解压即可用。它不是安装程序，而是一个 **DSH 插件目录**。
+
+          ## 安装
+
+          1. 解压到固定位置，例如 `D:\plugins\dsh-123pan`
+          2. 链接进 profile 的 node_modules（不需要管理员权限）：
+             ```
+             cmd /c mklink /J "%USERPROFILE%\.dsh\profiles\<profile>\node_modules\dsh-123pan" "D:\plugins\dsh-123pan"
+             ```
+          3. 在 `%USERPROFILE%\.dsh\profiles\<profile>\package.json` 里**两处**都加上：
+             - `dependencies`：`"dsh-123pan": "file:D:/plugins/dsh-123pan"`
+             - `dsh.profile.bundles`：追加 `"dsh-123pan"`
+          4. **完全退出** DSH（任务管理器确认 `DeepSeek Harness.exe` 全部消失）再打开
+
+          装好后：左侧栏出现云朵图标（侧栏面板），设置里出现「123 云盘」页签。
+
+          ## 要求
+
+          - Windows 10 / 11 x64
+          - DSH 0.2.x
+          - 核心 `native/core/123pan-core.exe` 随包提供，静态链接、无运行时依赖
+
+          ## 文档
+
+          - `README.md` —— 功能与快速开始
+          - `docs/USAGE.md` —— 完整使用说明（登录、拖拽上传、下载目录、备份、API、FAQ）
+          - `AGENT.md` —— 给 AI agent 的上传指南（别生成 .py 中转脚本）
+
+          ## 已知限制
+
+          - 仅 Windows（Winsock + DPAPI + Windows 证书存储）
+          - 下载不支持断点续传
+          - 拖拽上传走 base64，单文件默认 200MB 封顶；大文件请用「按路径上传」工具
+          NOTES
+
+      - name: Create or update release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          sed -i "s/VERSION/${GITHUB_REF_NAME}/" NOTES.md
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" "$ASSET" --clobber
+            gh release edit "$GITHUB_REF_NAME" --notes-file NOTES.md
+          else
+            gh release create "$GITHUB_REF_NAME" "$ASSET" \
+              --title "dsh-123pan ${GITHUB_REF_NAME}" \
+              --notes-file NOTES.md
+          fi
