@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="123 Cloud Drive">
+  <defs>
+    <linearGradient id="g123" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2A82E4"/>
+      <stop offset="1" stop-color="#1B5FBF"/>
+    </linearGradient>
+  </defs>
+  <rect x="2" y="2" width="60" height="60" rx="14" fill="url(#g123)"/>
+  <path d="M20 40.5a7.5 7.5 0 0 1 .9-14.95A10.5 10.5 0 0 1 41.6 27.4a6.6 6.6 0 0 1 2.4 13.1z"
+        fill="none" stroke="#ffffff" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M32 33.5v13" fill="none" stroke="#ffffff" stroke-width="3.4" stroke-linecap="round"/>
+  <path d="M27.4 38.4 32 33.4l4.6 5" fill="none" stroke="#ffffff" stroke-width="3.4"
+        stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

@@ -1,0 +1,7 @@
+- insert:
+    - id: dsh-123pan
+      name: dsh-123pan
+      config:
+        defaultRemoteDir: ''
+        maxFileBytes: 209715200
+        maxFiles: 5000

@@ -1,0 +1,26 @@
+# 依赖与构建产物
+node_modules/
+*.o
+*.obj
+*.pdb
+*.ilk
+
+# 本地数据（绝不能提交）
+.data/
+data/
+session.dat
+backups.json
+.dsh-123pan-staging/
+incoming/
+
+# 测试与临时
+_test/
+.tmpx/
+*.tmp
+*.log
+
+# 编辑器
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

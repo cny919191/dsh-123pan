@@ -1,0 +1,70 @@
+{
+  "name": "dsh-123pan",
+  "version": "1.2.0",
+  "private": true,
+  "description": "123 Cloud Drive (123云盘) for DeepSeek Harness: sign in with phone/email + password, upload and download files, and back up workspaces incrementally. Network and multipart transfer run in a bundled static C++ core.",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "lib/*.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg",
+    "native/core/*.cpp",
+    "native/core/*.hpp",
+    "native/core/build.sh",
+    "native/core/123pan-core.exe",
+    "test/*.mjs",
+    "test/README.md",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "docs/*.md"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-settings"
+      ]
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh-tools": "^0.1.7-rc.1 || ^0.2.0-rc.1"
+  },
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "123pan",
+    "123云盘",
+    "backup",
+    "cloud-drive"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/USER/dsh-123pan.git"
+  },
+  "homepage": "https://github.com/USER/dsh-123pan#readme",
+  "bugs": {
+    "url": "https://github.com/USER/dsh-123pan/issues"
+  }
+}
