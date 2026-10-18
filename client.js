@@ -125,10 +125,28 @@ window.__ModuleLoader__.load({
         body = h('pre', { className: 'dsp123-pvText' }, pv.text);
       } else if (pv.kind === 'image') {
         body = h('img', { className: 'dsp123-pvImg', src: pv.mediaUrl, alt: pv.name });
-      } else if (pv.kind === 'video') {
-        body = h('video', { className: 'dsp123-pvMedia', src: pv.mediaUrl, controls: true, autoPlay: true });
-      } else if (pv.kind === 'audio') {
-        body = h('audio', { className: 'dsp123-pvAudio', src: pv.mediaUrl, controls: true, autoPlay: true });
+      } else if (pv.kind === 'video' || pv.kind === 'audio') {
+        // 优先直连 CDN：<source type=…> 让浏览器按声明的 MIME 解码，不依赖响应头
+        // （123 的直链一律 application/octet-stream），且 Range 由 CDN 原生处理，
+        // 拖动进度最稳。直链失效时回退到同源代理 mediaUrl。
+        const src = pv.directUrl || pv.mediaUrl;
+        const props = {
+          className: pv.kind === 'video' ? 'dsp123-pvMedia' : 'dsp123-pvAudio',
+          controls: true,
+          autoPlay: true,
+          playsInline: true,
+          onError: (e) => {
+            const el = e.currentTarget;
+            if (pv.mediaUrl && el && el.src && el.src.indexOf('/media') < 0) {
+              el.src = pv.mediaUrl;
+              el.load();
+            }
+          },
+        };
+        body =
+          pv.kind === 'video'
+            ? h('video', props, h('source', { src, type: pv.mime }))
+            : h('audio', props, h('source', { src, type: pv.mime }));
       } else if (pv.kind === 'pdf') {
         body = h('iframe', { className: 'dsp123-pvFrame', src: pv.mediaUrl, title: pv.name });
       } else {
@@ -1494,7 +1512,7 @@ window.__ModuleLoader__.load({
           h('input', {
             className: 'dsp123-input',
             style: { flex: 1, minWidth: 0 },
-            placeholder: '大文件用路径上传，如 G:\\93阅兵.mp4',
+            placeholder: `大文件超过 ${Math.round(DRAG_UPLOAD_LIMIT / 1024 / 1024)}MB 请用完整路径上传`,
             value: uploadPath,
             onChange: (e) => setUploadPath(e.target.value),
             onKeyDown: (e) => {
