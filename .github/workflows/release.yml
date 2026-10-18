@@ -24,14 +24,29 @@ jobs:
           # git archive 只打包被跟踪的文件（自动排除 .git 与 .gitignore 里的内容）
           git archive --format=zip --prefix=dsh-123pan/ -o "$NAME" HEAD
           ls -lh "$NAME"
-          echo "ASSET=$NAME" >> "$GITHUB_ENV"
+          echo "ZIP=$NAME" >> "$GITHUB_ENV"
+
+      - name: Build installable tarball
+        run: |
+          set -euo pipefail
+          # npm pack 产出标准 npm tarball（根目录为 package/），可直接 dsh plugin add
+          npm pack --silent
+          mv dsh-123pan-*.tgz dsh-123pan.tgz
+          # 资产名保持无版本号：tarball 链接用 releases/latest/download/dsh-123pan.tgz 不会因发版失效
+          ls -lh dsh-123pan.tgz
+          echo "TGZ=dsh-123pan.tgz" >> "$GITHUB_ENV"
 
       - name: Write release notes
         run: |
           cat > NOTES.md <<'NOTES'
           123 云盘插件（DeepSeek Harness）
 
-          下载 `dsh-123pan-VERSION.zip` 解压即可用。它不是安装程序，而是一个 **DSH 插件目录**。
+          两种资产管理：
+
+          - `dsh-123pan-VERSION.zip` —— 解压即用的插件目录（推荐手动安装）
+          - `dsh-123pan.tgz` —— 标准 npm 包，可直接 `dsh plugin add <本地路径>/dsh-123pan.tgz`
+
+          它们都不是安装程序。
 
           ## 安装
 
@@ -73,10 +88,10 @@ jobs:
           set -euo pipefail
           sed -i "s/VERSION/${GITHUB_REF_NAME}/" NOTES.md
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" "$ASSET" --clobber
+            gh release upload "$GITHUB_REF_NAME" "$ZIP" "$TGZ" --clobber
             gh release edit "$GITHUB_REF_NAME" --notes-file NOTES.md
           else
-            gh release create "$GITHUB_REF_NAME" "$ASSET" \
+            gh release create "$GITHUB_REF_NAME" "$ZIP" "$TGZ" \
               --title "dsh-123pan ${GITHUB_REF_NAME}" \
               --notes-file NOTES.md
           fi
