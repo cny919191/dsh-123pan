@@ -1,5 +1,17 @@
 # 更新记录
 
+## 1.3.1
+
+**修复：1.3.0 打开侧栏面板后空白、文件列表不显示**
+
+- 原因：预览用的 3 个 hook（2 个 useCallback + 1 个 useEffect）写在了
+  `if (status.loading) return …` / `if (!loggedIn) return …` **之后**。
+  首次渲染走提前 return（少调 3 个 hook），状态到位后走到完整分支（多调 3 个 hook），
+  React 报 "Rendered more hooks than during the previous render"，整个面板崩掉。
+- 修法：把这 3 个 hook 移到所有提前 return 之前。
+- 新增 `test/hooks_order.mjs`：同一组件用「加载中 / 未登录 / 已登录」三种状态各渲染一次，
+  要求 hook 调用次数完全一致 —— 专门拦这类问题（本次修复前是 21 vs 24）。
+
 ## 1.3.0
 
 **新增：在线预览（文本 / 图片 / 视频 / 音频 / PDF）**

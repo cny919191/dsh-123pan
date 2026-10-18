@@ -1335,22 +1335,6 @@ window.__ModuleLoader__.load({
         });
       };
 
-      if (status.loading) {
-        return h('div', { className: 'dsp123' }, h('style', null, CSS), h('p', null, '正在检查登录状态…'));
-      }
-
-      if (!loggedIn) {
-        return h(
-          'div',
-          { className: 'dsp123', style: { padding: 16 } },
-          h('style', null, CSS),
-          h('h2', null, '123 云盘'),
-          h('p', null, '还没有登录 123 云盘。'),
-          status.error && h('div', { className: 'dsp123-note dsp123-noteWarn' }, status.error),
-          h('p', { className: 'dsp123-sub' }, '请在「设置 → 123 云盘」里用手机号或邮箱登录，登录后这里就能拖拽上传。')
-        );
-      }
-
       /** 打开在线预览：文本由宿主解码，图片/视频/PDF 走同源媒体代理。 */
       const openPreview = useCallback(async (item) => {
         if (!item || item.type === 1) return;
@@ -1377,6 +1361,23 @@ window.__ModuleLoader__.load({
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
       }, [previewState, closePreview]);
+
+      if (status.loading) {
+        return h('div', { className: 'dsp123' }, h('style', null, CSS), h('p', null, '正在检查登录状态…'));
+      }
+
+      if (!loggedIn) {
+        return h(
+          'div',
+          { className: 'dsp123', style: { padding: 16 } },
+          h('style', null, CSS),
+          h('h2', null, '123 云盘'),
+          h('p', null, '还没有登录 123 云盘。'),
+          status.error && h('div', { className: 'dsp123-note dsp123-noteWarn' }, status.error),
+          h('p', { className: 'dsp123-sub' }, '请在「设置 → 123 云盘」里用手机号或邮箱登录，登录后这里就能拖拽上传。')
+        );
+      }
+
 
       const renderPreview = () => previewTree(previewState, closePreview);
 
