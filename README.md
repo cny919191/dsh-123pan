@@ -68,7 +68,8 @@ g++ -O2 -std=c++17 main.cpp api.cpp http.cpp winutil.cpp -o 123pan-core -lssl -l
 > 移植到 Linux/macOS 需要替换 `http.cpp` 的连接层与 `winutil.cpp` 的加密/路径部分，
 > 其余 API 逻辑（`api.cpp`）与协议无关，可直接复用。
 
-> 完整使用说明（安装、登录、上传下载、备份、AI 工具、常见问题、安全说明）见 **[docs/USAGE.md](docs/USAGE.md)**。
+> - 给人看：**[docs/USAGE.md](docs/USAGE.md)**（安装、登录、上传下载、备份、AI 工具、常见问题、安全说明）
+> - 给 Agent 看：**[AGENT.md](AGENT.md)**（上传自己生成的文件时照这个做，不要生成 .py 中转脚本）
 
 ## 两种入口
 
