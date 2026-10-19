@@ -173,6 +173,17 @@ window.__ModuleLoader__.load({
               pv.name || '预览'
             ),
             meta && h('span', { className: 'dsp123-sub', style: { fontSize: 11, flex: 'none' } }, meta),
+            pv.directUrl &&
+              h(
+                'button',
+                {
+                  className: 'dsp123-btn',
+                  style: { height: 24, padding: '0 8px', fontSize: 12, flex: 'none' },
+                  onClick: () => window.open(pv.directUrl, '_blank', 'noopener'),
+                  title: '在浏览器新窗口打开（原生播放器，可自由拖动进度）',
+                },
+                '新窗口'
+              ),
             h(
               'button',
               { className: 'dsp123-btn', style: { height: 24, padding: '0 8px', fontSize: 12, flex: 'none' }, onClick: onClose, title: '关闭（Esc）' },

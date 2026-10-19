@@ -1,5 +1,25 @@
 # 更新记录
 
+## 1.3.3
+
+**修复：视频预览拖不动进度条（无法从 11:00 跳到 12:00）**
+
+- 视频/音频改用 **CDN 直链 + `<video><source type=…>`**：
+  `type` 属性让浏览器按声明的 MIME 解码，不必依赖响应头
+  （123 直链一律 `application/octet-stream`，`<video>` 认不了）；
+  Range 由 CDN 原生处理，拖动最稳。加载失败自动回退同源代理。
+- `preview` 路由新增 `directUrl` 字段；预览弹层右上角新增**「新窗口」**按钮，
+  可在浏览器原生播放器里打开（拖动最可靠，兜底方案）。
+- 侧栏「按路径上传」占位文字改为「大文件超过 64MB 请用完整路径上传」。
+
+**已排除的排查方向（写下来免得重查）**
+- 该 mp4 是 faststart（`ftyp` → `moov` 在文件头），本身可流式跳转
+- CDN 直链支持 Range：`bytes=443762155-` → 206 + 正确 `content-range`
+- 同源代理经过运行中的 DSH 也返回 206 + 正确 `content-range`
+  ⇒ 问题不在 Range 链路，在 `<video>` 的 MIME 嗅探 / 媒体栈
+
+**新增测试**：`test/preview_direct.mjs`（校验 directUrl 存在且支持 Range）
+
 ## 1.3.2
 
 **新增：侧栏「按路径上传」**
