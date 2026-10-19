@@ -40,6 +40,34 @@ window.__ModuleLoader__.load({
     /** 槽位未提供 useSessions 时的兜底：恒定返回 undefined，保持 hook 调用顺序稳定。 */
     const NO_SESSIONS_HOOK = () => undefined;
 
+    /** 用户粘贴路径时带的外层引号（资源管理器「复制文件地址」会给一对双引号）。 */
+    const QUOTE_PAIRS = [
+      ['"', '"'],
+      ["'", "'"],
+      ['\u201c', '\u201d'],
+      ['\u2018', '\u2019'],
+      ['`', '`'],
+      ['\u300c', '\u300d'],
+      ['\u3010', '\u3011'],
+    ];
+
+    /** 剥掉成对外层引号；宿主侧还会再洗一遍，双保险。 */
+    function stripQuotes(value) {
+      let s = String(value ?? '').trim();
+      let changed = true;
+      let guard = 0;
+      while (changed && guard++ < 10) {
+        changed = false;
+        for (const [open, close] of QUOTE_PAIRS) {
+          if (s.length >= 2 && s.startsWith(open) && s.endsWith(close)) {
+            s = s.slice(open.length, s.length - close.length).trim();
+            changed = true;
+          }
+        }
+      }
+      return s;
+    }
+
     /** notice 兜底文案：空文本时也不留一条没有字的色块。 */
     function noticeText(notice) {
       const text = String(notice?.text ?? '').trim();
@@ -542,17 +570,36 @@ window.__ModuleLoader__.load({
       };
 
       const doUpload = async () => {
-        const file = uploadPath.trim();
+        const file = stripQuotes(uploadPath);
         if (!file) {
           setNotice({ kind: 'err', text: '请填写本地文件路径' });
           return;
         }
         setBusy('upload');
         setNotice(null);
-        setProgress({ fraction: 0, stage: '准备上传' });
+        setProgress({ fraction: 0, stage: '准备上传', bytes: 0, totalBytes: 0 });
         try {
-          const value = await call('upload', { file, parentId });
-          setNotice({ kind: 'ok', text: `${value.reused ? '秒传' : '上传'}完成：${value.name}（${formatBytes(value.size)}）` });
+          const started = await call('uploadStart', { file, parentId });
+          const taskId = started.taskId;
+          let state = null;
+          for (let i = 0; i < 7200; i++) {
+            await new Promise((r) => setTimeout(r, 500));
+            state = await call('uploadState', { taskId });
+            setProgress({
+              fraction: Number(state.fraction) || 0,
+              stage: state.stage || '',
+              bytes: Number(state.bytes) || 0,
+              totalBytes: Number(state.total) || 0,
+            });
+            if (state.state !== 'running') break;
+          }
+          if (!state) throw new Error('上传状态未知');
+          if (state.state === 'error') throw new Error(state.error || '上传失败');
+          const value = state.result || {};
+          setNotice({
+            kind: 'ok',
+            text: `${value.reused ? '秒传' : '上传'}完成：${value.name || file}（${formatBytes(value.size ?? state.total)}）`,
+          });
           setUploadPath('');
           await load(parentId);
         } catch (error) {
@@ -846,7 +893,18 @@ window.__ModuleLoader__.load({
             h(
               'div',
               null,
-              h('div', { className: 'dsp123-sub', style: { marginBottom: 6 } }, progress.stage || '上传中'),
+              h(
+                'div',
+                { className: 'dsp123-sub', style: { marginBottom: 6, display: 'flex', justifyContent: 'space-between', gap: 8 } },
+                h('span', null, progress.stage || '上传中'),
+                progress.totalBytes
+                  ? h(
+                      'span',
+                      { style: { flex: 'none', fontVariantNumeric: 'tabular-nums' } },
+                      `${formatBytes(progress.bytes)} / ${formatBytes(progress.totalBytes)}`
+                    )
+                  : null
+              ),
               h('div', { className: 'dsp123-progress' }, h('i', { style: { width: `${Math.round((progress.fraction || 0) * 100)}%` } }))
             ),
           h(
@@ -1311,19 +1369,37 @@ window.__ModuleLoader__.load({
 
       /** 按本机路径上传：大文件走这条，不经过浏览器内存。 */
       const uploadByPath = async () => {
-        const file = uploadPath.trim();
+        // 用户从资源管理器「复制文件地址」拿到的是带引号的路径，这里先剥掉
+        const file = stripQuotes(uploadPath);
         if (!file) {
           setNotice({ kind: 'err', text: '请填写本机文件路径，例如 D:\\video\\a.mp4' });
           return;
         }
         setBusy('upload');
         setNotice(null);
-        setProgress({ name: file, index: 1, total: 1 });
+        setProgress({ name: file, bytes: 0, totalBytes: 0, fraction: 0, stage: '准备上传' });
         try {
-          const value = await call('upload', { file, parentId });
+          const started = await call('uploadStart', { file, parentId });
+          const taskId = started.taskId;
+          let state = null;
+          for (let i = 0; i < 7200; i++) {
+            await new Promise((r) => setTimeout(r, 500));
+            state = await call('uploadState', { taskId });
+            setProgress({
+              name: state.name || file,
+              bytes: Number(state.bytes) || 0,
+              totalBytes: Number(state.total) || 0,
+              fraction: Number(state.fraction) || 0,
+              stage: state.stage || '',
+            });
+            if (state.state !== 'running') break;
+          }
+          if (!state) throw new Error('上传状态未知');
+          if (state.state === 'error') throw new Error(state.error || '上传失败');
+          const value = state.result || {};
           setNotice({
             kind: 'ok',
-            text: `${value.reused ? '秒传' : '上传'}完成：${value.name}（${formatBytes(value.size)}）`,
+            text: `${value.reused ? '秒传' : '上传'}完成：${value.name || file}（${formatBytes(value.size ?? state.total)}）`,
           });
           setUploadPath('');
           await load(parentId);
@@ -1547,8 +1623,28 @@ window.__ModuleLoader__.load({
           h(
             'div',
             { className: 'dsp123-card', style: { padding: '10px 12px', gap: 6 } },
-            h('div', { className: 'dsp123-sub' }, `正在上传 ${progress.index}/${progress.total}：${progress.name}`),
-            h('div', { className: 'dsp123-progress' }, h('i', { style: { width: '100%' } }))
+            h(
+              'div',
+              { className: 'dsp123-sub', style: { display: 'flex', justifyContent: 'space-between', gap: 8 } },
+              h(
+                'span',
+                { style: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } },
+                progress.totalBytes
+                  ? progress.name || '上传中'
+                  : `正在上传 ${progress.index}/${progress.total}：${progress.name}`
+              ),
+              progress.totalBytes
+                ? h(
+                    'span',
+                    { style: { flex: 'none', fontVariantNumeric: 'tabular-nums' } },
+                    `${formatBytes(progress.bytes)} / ${formatBytes(progress.totalBytes)}`
+                  )
+                : null
+            ),
+            progress.stage &&
+              progress.totalBytes &&
+              h('div', { className: 'dsp123-sub', style: { fontSize: 11 } }, progress.stage),
+            h('div', { className: 'dsp123-progress' }, h('i', { style: { width: `${Math.round((progress.fraction ?? 1) * 100)}%` } }))
           ),
 
         notice &&
