@@ -591,12 +591,18 @@ bool Client::rename(long long fileId, const std::string& newName, ApiError& err)
 }
 
 bool Client::move(const std::vector<long long>& ids, long long toParent, ApiError& err) {
+  // 123pan 的 /api/file/mod_pid 要的是：
+  //   {"fileIdList":[{"FileId":123}],"parentFileId":456}
+  // （不是 fileIds / toParentFileId —— 写错时接口仍返回 code 0，但什么也不做）
   jsonx::JVal body = jsonx::JVal::object();
-  body.set("driveId", jsonx::JVal::of(0));
   jsonx::JVal arr = jsonx::JVal::array();
-  for (long long id : ids) arr.push(jsonx::JVal::of((long long)id));
-  body.set("fileIds", arr);
-  body.set("toParentFileId", jsonx::JVal::of((long long)toParent));
+  for (long long id : ids) {
+    jsonx::JVal item = jsonx::JVal::object();
+    item.set("FileId", jsonx::JVal::of((long long)id));
+    arr.push(item);
+  }
+  body.set("fileIdList", arr);
+  body.set("parentFileId", jsonx::JVal::of((long long)toParent));
   jsonx::JVal out;
   return call("/api/file/mod_pid", "POST", &body, "", out, err);
 }
