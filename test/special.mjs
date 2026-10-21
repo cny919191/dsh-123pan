@@ -2,9 +2,21 @@ import * as c from '../lib/core.js';
 import fs from 'node:fs';
 import path from 'node:path';
 
+// 测试账号只能从环境变量取，避免把别人的账号写进仓库、也避免覆盖已保存的登录态
+function requireEnv(name) {
+  const v = process.env[name];
+  if (!v) {
+    console.error(`缺少环境变量 ${name}。测试会登录并改写已保存的会话，必须显式提供：`);
+    console.error('  set PAN123_TEST_ACCOUNT=你的测试账号');
+    console.error('  set PAN123_TEST_PASSWORD=你的测试密码');
+    process.exit(2);
+  }
+  return v;
+}
+
 const cfg = {};
 console.log('login...');
-await c.coreLogin(cfg, { account: '19900000001', password: '123456' });
+await c.coreLogin(cfg, { account: requireEnv('PAN123_TEST_ACCOUNT'), password: requireEnv('PAN123_TEST_PASSWORD') });
 
 // 建一个含中文、空格、特殊符号的测试目录
 const name = '测试 目录#1 (v2)';
