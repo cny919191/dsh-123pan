@@ -139,6 +139,9 @@ window.__ModuleLoader__.load({
      * 在线预览浮层（两个面板共用）。返回元素树；无预览内容时返回 null。
      * pv.kind: text / image / video / audio / pdf / other
      */
+    /** 云端内部拖拽：记住正在被拖的条目（dragover 期间读不到 dataTransfer 的内容）。 */
+    let INTERNAL_DRAG = null;
+
     /** 拖拽上传走 base64，超过这个体积就引导改用「按路径上传」。 */
     const DRAG_UPLOAD_LIMIT = 64 * 1024 * 1024;
 
@@ -1240,6 +1243,7 @@ window.__ModuleLoader__.load({
           if (typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation();
         };
         const onOver = (e) => {
+          if (INTERNAL_DRAG) return; // 云端内部拖拽（文件 → 文件夹），走另一套
           if (!inside(e)) return;
           swallow(e);
           try {
@@ -1258,6 +1262,7 @@ window.__ModuleLoader__.load({
           setOver(false);
         };
         const onDrop = (e) => {
+          if (INTERNAL_DRAG) return; // 内部拖拽由行自己的 onDrop 处理
           if (!inside(e)) return;
           swallow(e);
           setOver(false);
@@ -1293,6 +1298,24 @@ window.__ModuleLoader__.load({
       const panelRef = useRef(null);
       const dropHandlerRef = useRef(null);
       const dragOver = useDropZone(panelRef, dropHandlerRef);
+      // 云端内部拖拽：当前悬停的目标文件夹 id（用于高亮）
+      const [dropTargetId, setDropTargetId] = useState(0);
+
+      /** 把云端已有的条目移动到目标目录（拖拽落点调用）。 */
+      const moveItems = async (fileIds, targetId, targetName) => {
+        if (!fileIds || fileIds.length === 0) return;
+        setBusy('move');
+        setNotice(null);
+        try {
+          await call('move', { fileIds, parentId: targetId });
+          setNotice({ kind: 'ok', text: `已移动 ${fileIds.length} 项到「${targetName || '目标目录'}」` });
+          await load(parentId);
+        } catch (e) {
+          setNotice({ kind: 'err', text: `移动失败：${noticeText(e)}` });
+        } finally {
+          setBusy('');
+        }
+      };
       const [progress, setProgress] = useState(null);
       const [workspaceRoot, setWorkspaceRoot] = useState('');
       // 自定义下载目录：空字符串表示「跟随工作区」。
@@ -1794,12 +1817,69 @@ window.__ModuleLoader__.load({
               'div',
               {
                 key: item.fileId,
+                draggable: !trashed,
+                title: trashed ? undefined : item.type === 1 ? '拖到别的文件夹可移动' : '拖到文件夹上可移动',
                 style: {
                   display: 'flex',
                   alignItems: 'center',
                   gap: 8,
                   padding: '6px 4px',
                   borderBottom: '1px solid var(--dsw-alias-border-l1)',
+                  ...(dropTargetId === item.fileId
+                    ? {
+                        outline: '2px dashed var(--dsw-alias-brand-primary)',
+                        outlineOffset: -2,
+                        borderRadius: 6,
+                        background: 'var(--dsw-alias-state-success-tertiary)',
+                      }
+                    : null),
+                },
+                // ---- 云端内部拖拽：拖起 ----
+                onDragStart: (e) => {
+                  if (trashed) {
+                    e.preventDefault();
+                    return;
+                  }
+                  INTERNAL_DRAG = { fileIds: [Number(item.fileId)], name: item.name };
+                  try {
+                    e.dataTransfer.effectAllowed = 'move';
+                    e.dataTransfer.setData('text/plain', String(item.fileId));
+                    e.dataTransfer.setData('application/x-dsh123pan-item', '1');
+                  } catch {
+                    /* 某些环境不允许写 dataTransfer，忽略（内部状态已经记住） */
+                  }
+                },
+                onDragEnd: () => {
+                  INTERNAL_DRAG = null;
+                  setDropTargetId(0);
+                },
+                // ---- 文件夹行：接收落点 ----
+                onDragOver: (e) => {
+                  if (trashed) return;
+                  if (!INTERNAL_DRAG) return;
+                  if (item.type !== 1) return;
+                  if (Number(item.fileId) === INTERNAL_DRAG.fileIds[0]) return;
+                  e.preventDefault();
+                  e.stopPropagation();
+                  try {
+                    e.dataTransfer.dropEffect = 'move';
+                  } catch {
+                    /* 忽略 */
+                  }
+                  if (dropTargetId !== item.fileId) setDropTargetId(item.fileId);
+                },
+                onDragLeave: () => {
+                  if (dropTargetId === item.fileId) setDropTargetId(0);
+                },
+                onDrop: (e) => {
+                  if (trashed || !INTERNAL_DRAG || item.type !== 1) return;
+                  if (Number(item.fileId) === INTERNAL_DRAG.fileIds[0]) return;
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const ids = INTERNAL_DRAG.fileIds.slice();
+                  INTERNAL_DRAG = null;
+                  setDropTargetId(0);
+                  moveItems(ids, Number(item.fileId), item.name);
                 },
               },
               item.type === 1
