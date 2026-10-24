@@ -1301,6 +1301,61 @@ window.__ModuleLoader__.load({
       // 云端内部拖拽：当前悬停的目标文件夹 id（用于高亮）
       const [dropTargetId, setDropTargetId] = useState(0);
 
+      /**
+       * 行与按钮共用的拖拽属性。
+       *
+       * ⚠ 必须同时挂到 <button> 上：Chromium 默认不会从按钮发起 HTML5 拖拽，
+       * 只挂在行 div 上时，因为可点击区域几乎全是按钮，按住左键会「毫无反应」。
+       */
+      const rowDragProps = (item) => ({
+        draggable: !trashed,
+        onDragStart: (e) => {
+          if (trashed) {
+            e.preventDefault();
+            return;
+          }
+          INTERNAL_DRAG = { fileIds: [Number(item.fileId)], name: item.name };
+          try {
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', String(item.fileId));
+            e.dataTransfer.setData('application/x-dsh123pan-item', '1');
+          } catch {
+            /* 某些环境不允许写 dataTransfer，内部状态已经记住，忽略 */
+          }
+        },
+        onDragEnd: () => {
+          INTERNAL_DRAG = null;
+          setDropTargetId(0);
+        },
+        onDragOver: (e) => {
+          if (trashed) return;
+          if (!INTERNAL_DRAG) return;
+          if (item.type !== 1) return;
+          if (Number(item.fileId) === INTERNAL_DRAG.fileIds[0]) return;
+          e.preventDefault();
+          e.stopPropagation();
+          try {
+            e.dataTransfer.dropEffect = 'move';
+          } catch {
+            /* 忽略 */
+          }
+          if (dropTargetId !== item.fileId) setDropTargetId(item.fileId);
+        },
+        onDragLeave: () => {
+          if (dropTargetId === item.fileId) setDropTargetId(0);
+        },
+        onDrop: (e) => {
+          if (trashed || !INTERNAL_DRAG || item.type !== 1) return;
+          if (Number(item.fileId) === INTERNAL_DRAG.fileIds[0]) return;
+          e.preventDefault();
+          e.stopPropagation();
+          const ids = INTERNAL_DRAG.fileIds.slice();
+          INTERNAL_DRAG = null;
+          setDropTargetId(0);
+          moveItems(ids, Number(item.fileId), item.name);
+        },
+      });
+
       /** 把云端已有的条目移动到目标目录（拖拽落点调用）。 */
       const moveItems = async (fileIds, targetId, targetName) => {
         if (!fileIds || fileIds.length === 0) return;
@@ -1834,59 +1889,14 @@ window.__ModuleLoader__.load({
                       }
                     : null),
                 },
-                // ---- 云端内部拖拽：拖起 ----
-                onDragStart: (e) => {
-                  if (trashed) {
-                    e.preventDefault();
-                    return;
-                  }
-                  INTERNAL_DRAG = { fileIds: [Number(item.fileId)], name: item.name };
-                  try {
-                    e.dataTransfer.effectAllowed = 'move';
-                    e.dataTransfer.setData('text/plain', String(item.fileId));
-                    e.dataTransfer.setData('application/x-dsh123pan-item', '1');
-                  } catch {
-                    /* 某些环境不允许写 dataTransfer，忽略（内部状态已经记住） */
-                  }
-                },
-                onDragEnd: () => {
-                  INTERNAL_DRAG = null;
-                  setDropTargetId(0);
-                },
-                // ---- 文件夹行：接收落点 ----
-                onDragOver: (e) => {
-                  if (trashed) return;
-                  if (!INTERNAL_DRAG) return;
-                  if (item.type !== 1) return;
-                  if (Number(item.fileId) === INTERNAL_DRAG.fileIds[0]) return;
-                  e.preventDefault();
-                  e.stopPropagation();
-                  try {
-                    e.dataTransfer.dropEffect = 'move';
-                  } catch {
-                    /* 忽略 */
-                  }
-                  if (dropTargetId !== item.fileId) setDropTargetId(item.fileId);
-                },
-                onDragLeave: () => {
-                  if (dropTargetId === item.fileId) setDropTargetId(0);
-                },
-                onDrop: (e) => {
-                  if (trashed || !INTERNAL_DRAG || item.type !== 1) return;
-                  if (Number(item.fileId) === INTERNAL_DRAG.fileIds[0]) return;
-                  e.preventDefault();
-                  e.stopPropagation();
-                  const ids = INTERNAL_DRAG.fileIds.slice();
-                  INTERNAL_DRAG = null;
-                  setDropTargetId(0);
-                  moveItems(ids, Number(item.fileId), item.name);
-                },
+                ...rowDragProps(item),
               },
               item.type === 1
                 ? h(
                     'button',
                     {
                       className: 'dsp123-btn',
+                      ...rowDragProps(item),
                       style: {
                         height: 22,
                         padding: '0 6px',
@@ -1904,7 +1914,8 @@ window.__ModuleLoader__.load({
                     'button',
                     {
                       className: 'dsp123-nameBtn',
-                      title: '点击在线预览',
+                      ...rowDragProps(item),
+                      title: '点击在线预览（按住可拖到文件夹移动）',
                       onClick: () => openPreview(item),
                     },
                     `📄 ${item.name}`
