@@ -1213,6 +1213,72 @@ window.__ModuleLoader__.load({
       );
     }
 
+    /**
+     * 拖拽上传：兼容 DSH 0.2.1+ 的「拖拽遮罩」。
+     *
+     * 0.2.1 起宿主体检时会在 document 上用**捕获阶段**监听 dragenter/dragover/drop
+     * （内部叫 dragMask），用来把拖进窗口的文件导向它自己的入口。捕获阶段早于冒泡，
+     * 所以插槽里 React 的 onDrop 根本收不到事件 —— 表现就是「拖进去没反应」。
+     *
+     * 这里在 window 的捕获阶段（比 document 更早）接管：
+     *   · 指针在面板范围内 → preventDefault + stopPropagation，自己处理；
+     *   · 范围外 → 直接返回，交给宿主的遮罩，不影响它自己的拖放。
+     */
+    function useDropZone(zoneRef, handlerRef) {
+      const [over, setOver] = useState(false);
+      useEffect(() => {
+        const inside = (e) => {
+          const el = zoneRef.current;
+          if (!el || typeof el.getBoundingClientRect !== 'function') return false;
+          const r = el.getBoundingClientRect();
+          if (!r.width || !r.height) return false;
+          return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+        };
+        const swallow = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation();
+        };
+        const onOver = (e) => {
+          if (!inside(e)) return;
+          swallow(e);
+          try {
+            if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+          } catch {
+            /* 某些 Chromium 版本对只读 DataTransfer 会抛错，忽略 */
+          }
+          setOver(true);
+        };
+        const onLeave = (e) => {
+          if (!inside(e)) {
+            setOver(false);
+            return;
+          }
+          e.preventDefault();
+          setOver(false);
+        };
+        const onDrop = (e) => {
+          if (!inside(e)) return;
+          swallow(e);
+          setOver(false);
+          const files = e.dataTransfer && e.dataTransfer.files;
+          if (files && files.length && handlerRef.current) handlerRef.current(files);
+        };
+        const opts = true; // 捕获阶段：必须比宿主的 dragMask 更早拿到事件
+        window.addEventListener('dragenter', onOver, opts);
+        window.addEventListener('dragover', onOver, opts);
+        window.addEventListener('dragleave', onLeave, opts);
+        window.addEventListener('drop', onDrop, opts);
+        return () => {
+          window.removeEventListener('dragenter', onOver, opts);
+          window.removeEventListener('dragover', onOver, opts);
+          window.removeEventListener('dragleave', onLeave, opts);
+          window.removeEventListener('drop', onDrop, opts);
+        };
+      }, [zoneRef, handlerRef]);
+      return over;
+    }
+
     // ---------------- 侧边栏主面板（拖拽上传 / 下载到工作区） ----------------
     function Pan123SidePanel(props) {
       const [status, setStatus] = useState({ loading: true, value: null, error: null });
@@ -1223,7 +1289,10 @@ window.__ModuleLoader__.load({
       const [search, setSearch] = useState('');
       const [notice, setNotice] = useState(null);
       const [busy, setBusy] = useState('');
-      const [dragOver, setDragOver] = useState(false);
+      // 拖拽状态由 useDropZone 管理（见上方注释：要抢在宿主的拖拽遮罩之前）
+      const panelRef = useRef(null);
+      const dropHandlerRef = useRef(null);
+      const dragOver = useDropZone(panelRef, dropHandlerRef);
       const [progress, setProgress] = useState(null);
       const [workspaceRoot, setWorkspaceRoot] = useState('');
       // 自定义下载目录：空字符串表示「跟随工作区」。
@@ -1360,12 +1429,8 @@ window.__ModuleLoader__.load({
         if (done > 0) load(parentId);
       };
 
-      const onDrop = (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        setDragOver(false);
-        uploadFiles(event.dataTransfer?.files);
-      };
+      // 供 useDropZone 的捕获阶段监听调用（ref 避免闭包拿到旧函数）
+      dropHandlerRef.current = (files) => uploadFiles(files);
 
       /** 按本机路径上传：大文件走这条，不经过浏览器内存。 */
       const uploadByPath = async () => {
@@ -1529,17 +1594,8 @@ window.__ModuleLoader__.load({
         'div',
         {
           className: 'dsp123',
+          ref: panelRef,
           style: { padding: '14px 16px 20px', boxSizing: 'border-box', overflow: 'auto' },
-          onDragOver: (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            setDragOver(true);
-          },
-          onDragLeave: (e) => {
-            e.preventDefault();
-            setDragOver(false);
-          },
-          onDrop,
         },
         h('style', null, CSS),
 
